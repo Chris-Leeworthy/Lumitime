@@ -22,7 +22,7 @@ struct FlowerState {
         dotAngle = CGFloat(seconds.truncatingRemainder(dividingBy: 60) / 60 * 2 * .pi)
     }
 
-    static func pattern(rotation: CGFloat = 0) -> NSBezierPath {
+    static func pattern(rotation: CGFloat = 0, reversedSkew: Bool = false) -> NSBezierPath {
         let pattern = NSBezierPath()
         for index in 0..<16 {
             let long = index.isMultiple(of: 2)
@@ -31,7 +31,7 @@ struct FlowerState {
             let spoke = NSBezierPath()
             // Tangentially offset roots give each ray the skew of the physical disc.
             // The tapered sides approach beside the hub instead of pointing at its centre.
-            let rootX: CGFloat = 4.5
+            let rootX: CGFloat = reversedSkew ? -4.5 : 4.5
             spoke.move(to: CGPoint(x: rootX - 0.35, y: -2))
             spoke.line(to: CGPoint(x: -halfWidth, y: -(length - halfWidth)))
             spoke.curve(to: CGPoint(x: 0, y: -length),
@@ -52,6 +52,7 @@ struct FlowerState {
 }
 
 final class ClockView: NSView {
+    let ornamentScale: CGFloat = 1.4641
     var date = Date()
     var displayOnly = UserDefaults.standard.bool(forKey: "displayOnly")
     var brightness: CGFloat = UserDefaults.standard.object(forKey: "dim") as? Bool == true ? 0.48 : 1
@@ -106,10 +107,11 @@ final class ClockView: NSView {
     func flower(seconds: Double) {
         NSGraphicsContext.saveGraphicsState()
         defer { NSGraphicsContext.restoreGraphicsState() }
-        // Enlarge the whole ornament around its centre and lift it slightly.
+        // Align the dot centre at the top of its orbit with the top bars' bottom edge.
+        let ornamentCentreY: CGFloat = 112 + 50 * ornamentScale
         let ornamentTransform = NSAffineTransform()
-        ornamentTransform.translateX(by: 645, yBy: 204)
-        ornamentTransform.scale(by: 1.331)
+        ornamentTransform.translateX(by: 645, yBy: ornamentCentreY)
+        ornamentTransform.scale(by: ornamentScale)
         ornamentTransform.translateX(by: -645, yBy: -212)
         ornamentTransform.concat()
         let state = FlowerState(seconds: seconds)
@@ -117,8 +119,8 @@ final class ClockView: NSView {
         let centre = NSAffineTransform()
         centre.translateX(by: 645, yBy: 212)
         centre.concat()
-        // The fixed mask uses the same skewed rays, offset clockwise by one degree.
-        FlowerState.pattern(rotation: 1.0).addClip()
+        // Opposite skew inferred from the mask photograph; widths remain approximate.
+        FlowerState.pattern(rotation: 1.0, reversedSkew: true).addClip()
         light(FlowerState.pattern(rotation: state.discAngle))
         NSGraphicsContext.restoreGraphicsState()
         let dot = CGPoint(x: 645 + 50 * sin(state.dotAngle), y: 212 - 50 * cos(state.dotAngle))
@@ -131,15 +133,33 @@ final class ClockView: NSView {
         let transform = NSAffineTransform(); transform.translateX(by: (bounds.width - 800 * scale)/2, yBy: (bounds.height - (displayOnly ? 405 : 570)*scale)/2)
         transform.scale(by: scale); transform.concat()
         if !displayOnly {
-            shape(NSRect(x: 235,y: 478,width: 330,height: 48),radius: 7,color: .black)
-            let stem = polygon([CGPoint(x: 326,y: 383),CGPoint(x: 474,y: 383),CGPoint(x: 491,y: 504),CGPoint(x: 309,y: 504)])
-            NSGradient(starting: NSColor(white: 0.91,alpha: 1), ending: NSColor(white: 0.64,alpha: 1))!.draw(in: stem,angle: 0)
-            shape(NSRect(x: 228,y: 509,width: 344,height: 9),radius: 3,color: NSColor(white: 0.16,alpha: 1))
+            shape(NSRect(x: 224,y: 484,width: 352,height: 39),radius: 2,color: NSColor(white: 0.035,alpha: 1))
+            let stem = polygon([CGPoint(x: 328,y: 390),CGPoint(x: 472,y: 390),CGPoint(x: 491,y: 517),CGPoint(x: 309,y: 517)])
+            NSGradient(starting: NSColor(white: 0.94,alpha: 1), ending: NSColor(white: 0.74,alpha: 1))!.draw(in: stem,angle: 0)
+            shape(NSRect(x: 224,y: 519,width: 352,height: 7),radius: 1,color: NSColor(white: 0.12,alpha: 1))
         }
-        let body = NSBezierPath(roundedRect: NSRect(x: 24,y: 24,width: 752,height: 386),xRadius: 48,yRadius: 48)
-        NSGradient(starting: NSColor(srgbRed: 0.96,green: 0.95,blue: 0.9,alpha: 1),ending: NSColor(srgbRed: 0.71,green: 0.71,blue: 0.66,alpha: 1))!.draw(in: body,angle: 90)
-        shape(NSRect(x: 42,y: 37,width: 716,height: 327),radius: 31,color: NSColor(white: 0.025,alpha: 1))
-        let glass = NSBezierPath(roundedRect: NSRect(x: 49,y: 43,width: 702,height: 312),xRadius: 26,yRadius: 26)
+        // KT-10B: nearly square upper shoulders, tapered sides, broad lower corners.
+        let body = NSBezierPath()
+        body.move(to: CGPoint(x: 37,y: 24))
+        body.line(to: CGPoint(x: 763,y: 24))
+        body.curve(to: CGPoint(x: 776,y: 38),controlPoint1: CGPoint(x: 773,y: 24),controlPoint2: CGPoint(x: 778,y: 29))
+        body.line(to: CGPoint(x: 747,y: 355))
+        body.curve(to: CGPoint(x: 699,y: 410),controlPoint1: CGPoint(x: 744,y: 394),controlPoint2: CGPoint(x: 730,y: 410))
+        body.line(to: CGPoint(x: 101,y: 410))
+        body.curve(to: CGPoint(x: 53,y: 355),controlPoint1: CGPoint(x: 70,y: 410),controlPoint2: CGPoint(x: 56,y: 394))
+        body.line(to: CGPoint(x: 24,y: 38))
+        body.curve(to: CGPoint(x: 37,y: 24),controlPoint1: CGPoint(x: 22,y: 29),controlPoint2: CGPoint(x: 27,y: 24))
+        body.close()
+        NSGradient(starting: NSColor(srgbRed: 0.96,green: 0.95,blue: 0.9,alpha: 1),ending: NSColor(srgbRed: 0.76,green: 0.76,blue: 0.70,alpha: 1))!.draw(in: body,angle: 90)
+        let glass = NSBezierPath()
+        glass.move(to: CGPoint(x: 47,y: 43))
+        glass.line(to: CGPoint(x: 753,y: 43))
+        glass.line(to: CGPoint(x: 727,y: 325))
+        glass.curve(to: CGPoint(x: 695,y: 355),controlPoint1: CGPoint(x: 725,y: 347),controlPoint2: CGPoint(x: 716,y: 355))
+        glass.line(to: CGPoint(x: 105,y: 355))
+        glass.curve(to: CGPoint(x: 73,y: 325),controlPoint1: CGPoint(x: 84,y: 355),controlPoint2: CGPoint(x: 75,y: 347))
+        glass.close()
+        NSColor(white: 0.02,alpha: 1).setStroke(); glass.lineWidth = 6; glass.stroke()
         NSGradient(starting: NSColor(srgbRed: 0.065,green: 0.061,blue: 0.047,alpha: 1),ending: NSColor(white: 0.012,alpha: 1))!.draw(in: glass,angle: 90)
         let time = ClockTime(date)
         let d = time.digits
@@ -156,9 +176,8 @@ final class ClockView: NSView {
         let indicatorFont = NSFont.monospacedSystemFont(ofSize: 14, weight: .medium)
         let indicatorAttributes: [NSAttributedString.Key: Any] = [
             .font: indicatorFont, .foregroundColor: orange.withAlphaComponent(brightness)]
-        let indicatorSize = indicator.size(withAttributes: indicatorAttributes)
-        // Centre beneath the flower; align the capital glyphs with the digit bottoms.
-        indicator.draw(at: CGPoint(x: 645 - indicatorSize.width / 2,
+        // Align with the leftmost petal extent and the bottom of the digits.
+        indicator.draw(at: CGPoint(x: 645 - 40 * ornamentScale,
                                    y: 291 - indicatorFont.ascender),
                        withAttributes: indicatorAttributes)
         NSGraphicsContext.restoreGraphicsState()
@@ -167,8 +186,15 @@ final class ClockView: NSView {
         NSColor(white: 1,alpha: 0.025).setFill()
         polygon([CGPoint(x: 49,y: 43),CGPoint(x: 751,y: 43),CGPoint(x: 751,y: 67),CGPoint(x: 49,y: 150)]).fill()
         NSGraphicsContext.restoreGraphicsState()
-        shape(NSRect(x: 568,y: 371,width: 118,height: 26),radius: 1,color: NSColor(srgbRed: 0.19,green: 0.13,blue: 0.10,alpha: 1))
-        ("LUMITIME" as NSString).draw(at: CGPoint(x: 576,y: 373),withAttributes: [.font: NSFont(name: "HelveticaNeue-CondensedBold",size: 21) ?? NSFont.boldSystemFont(ofSize: 19),.foregroundColor: NSColor(white: 0.94,alpha: 1)])
+        let badge = NSRect(x: 568,y: 371,width: 118,height: 26)
+        shape(badge,radius: 1,color: NSColor(srgbRed: 0.19,green: 0.13,blue: 0.10,alpha: 1))
+        let badgeText = "LUMITIME" as NSString
+        let badgeFont = NSFont(name: "HelveticaNeue-CondensedBold",size: 21) ?? NSFont.boldSystemFont(ofSize: 19)
+        let badgeAttributes: [NSAttributedString.Key: Any] = [.font: badgeFont,.foregroundColor: NSColor(white: 0.94,alpha: 1)]
+        let badgeSize = badgeText.size(withAttributes: badgeAttributes)
+        badgeText.draw(at: CGPoint(x: badge.midX - badgeSize.width / 2,
+                                  y: badge.midY + badgeFont.capHeight / 2 - badgeFont.ascender),
+                       withAttributes: badgeAttributes)
         NSGraphicsContext.restoreGraphicsState()
     }
 }
