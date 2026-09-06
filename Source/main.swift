@@ -22,15 +22,17 @@ struct FlowerState {
         dotAngle = CGFloat(seconds.truncatingRemainder(dividingBy: 60) / 60 * 2 * .pi)
     }
 
-    static func pattern(rotation: CGFloat = 0, mask: Bool = false) -> NSBezierPath {
+    static func pattern(rotation: CGFloat = 0) -> NSBezierPath {
         let pattern = NSBezierPath()
         for index in 0..<16 {
             let long = index.isMultiple(of: 2)
             let length: CGFloat = long ? 40 : 30
             let halfWidth: CGFloat = long ? 3.4 : 2.1
             let spoke = NSBezierPath()
-            // Narrow roots converge at the hub; straight tapered sides end in a round cap.
-            spoke.move(to: CGPoint(x: -0.35, y: mask ? -11 : -1.5))
+            // Tangentially offset roots give each ray the skew of the physical disc.
+            // The tapered sides approach beside the hub instead of pointing at its centre.
+            let rootX: CGFloat = 4.5
+            spoke.move(to: CGPoint(x: rootX - 0.35, y: -2))
             spoke.line(to: CGPoint(x: -halfWidth, y: -(length - halfWidth)))
             spoke.curve(to: CGPoint(x: 0, y: -length),
                         controlPoint1: CGPoint(x: -halfWidth, y: -length),
@@ -38,23 +40,12 @@ struct FlowerState {
             spoke.curve(to: CGPoint(x: halfWidth, y: -(length - halfWidth)),
                         controlPoint1: CGPoint(x: halfWidth * 0.55, y: -length),
                         controlPoint2: CGPoint(x: halfWidth, y: -length))
-            spoke.line(to: CGPoint(x: 0.35, y: mask ? -11 : -1.5))
+            spoke.line(to: CGPoint(x: rootX + 0.35, y: -2))
             spoke.close()
             let transform = AffineTransform(rotationByDegrees: CGFloat(index) * 22.5 + rotation)
             spoke.transform(using: transform)
             pattern.append(spoke)
-            if mask {
-                // Staggered inner apertures break the hub into tiny illuminated slivers.
-                for (radius, offset, width, height): (CGFloat, CGFloat, CGFloat, CGFloat) in [
-                    (7.5, 8, 1.6, 3.2), (3.5, -4, 1.0, 1.8)
-                ] {
-                    let slit = NSBezierPath(ovalIn: NSRect(x: -width / 2,
-                                                        y: -radius - height / 2,
-                                                        width: width, height: height))
-                    slit.transform(using: AffineTransform(rotationByDegrees: CGFloat(index) * 22.5 + offset))
-                    pattern.append(slit)
-                }
-            }
+
         }
         return pattern
     }
@@ -118,7 +109,7 @@ final class ClockView: NSView {
         // Enlarge the whole ornament around its centre and lift it slightly.
         let ornamentTransform = NSAffineTransform()
         ornamentTransform.translateX(by: 645, yBy: 204)
-        ornamentTransform.scale(by: 1.1)
+        ornamentTransform.scale(by: 1.331)
         ornamentTransform.translateX(by: -645, yBy: -212)
         ornamentTransform.concat()
         let state = FlowerState(seconds: seconds)
@@ -126,9 +117,8 @@ final class ClockView: NSView {
         let centre = NSAffineTransform()
         centre.translateX(by: 645, yBy: 212)
         centre.concat()
-        // A stationary aperture reveals only the overlapping part of the rotating disc.
-        // Both patterns remain rigid: no petal scaling, morphing, or opacity animation.
-        FlowerState.pattern(mask: true).addClip()
+        // The fixed mask uses the same skewed rays, offset clockwise by one degree.
+        FlowerState.pattern(rotation: 1.0).addClip()
         light(FlowerState.pattern(rotation: state.discAngle))
         NSGraphicsContext.restoreGraphicsState()
         let dot = CGPoint(x: 645 + 50 * sin(state.dotAngle), y: 212 - 50 * cos(state.dotAngle))
@@ -234,9 +224,9 @@ if CommandLine.arguments.contains("--self-test") {
         precondition(abs(a.discAngle - b.discAngle) < 0.000001)
         precondition(a.discAngle >= 0 && a.discAngle < 360)
     }
-    let mask = FlowerState.pattern()
-    let aligned = FlowerState.pattern(rotation: 45)
-    let offset = FlowerState.pattern(rotation: 11.25)
+    let mask = FlowerState.pattern(rotation: 1.0)
+    let aligned = FlowerState.pattern(rotation: 46.0)
+    let offset = FlowerState.pattern(rotation: 12.25)
     var fullArea = 0, offsetArea = 0, alignedArea = 0
     for x in -80...80 { for y in -80...80 {
         let point = CGPoint(x: Double(x) / 2, y: Double(y) / 2)

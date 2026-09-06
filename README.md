@@ -20,7 +20,7 @@ Drag the window to move it; resize from its edges. Display preferences persist b
 
 ## Design
 
-Custom vector segments reproduce the narrow, square-ended orange digits, divided vertical strokes, steady colon, and blank leading hour position. The seconds ornament uses a rigid rotating disc of 16 tapered, round-ended spokes, alternating long and short, behind a stationary matching aperture mask. Only their overlap is illuminated. The decorative disc rotates 45 degrees every eight seconds, with staggered inner mask apertures producing small slivers around the hub; the separate mask geometry is an approximation inferred from the supplied disc photograph. A small outer dot travels clockwise once per minute. Animation runs at 30 frames per second behind smoked glass, with a cream enclosure and pedestal.
+Custom vector segments reproduce the narrow, square-ended orange digits, divided vertical strokes, steady colon, and blank leading hour position. The seconds ornament uses a rigid rotating disc of 16 skewed, tapered, round-ended spokes with tangentially offset roots, alternating long and short, behind a static copy of the same skewed pattern rotated clockwise by 1°. Only the overlapping areas are illuminated. The decorative disc rotates 45 degrees every eight seconds. A small outer dot travels clockwise once per minute. Animation runs at 30 frames per second behind smoked glass, with a cream enclosure and pedestal.
 
 Visual references: [AITA KT-10B photographs](https://aita.ocnk.net/product/3385) and [meguri KT-10B photographs](https://meguri1960.theshop.jp/items/95396001).
 
