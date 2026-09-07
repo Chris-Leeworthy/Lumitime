@@ -53,6 +53,8 @@ struct FlowerState {
 
 final class ClockView: NSView {
     let ornamentScale: CGFloat = 1.4641
+    var fullScreenPreview = false
+    var isFullScreenDisplay: Bool { fullScreenPreview || window?.styleMask.contains(.fullScreen) == true }
     var date = Date()
     var displayOnly = UserDefaults.standard.bool(forKey: "displayOnly")
     var brightness: CGFloat = UserDefaults.standard.object(forKey: "dim") as? Bool == true ? 0.48 : 1
@@ -107,7 +109,7 @@ final class ClockView: NSView {
     func flower(seconds: Double) {
         NSGraphicsContext.saveGraphicsState()
         defer { NSGraphicsContext.restoreGraphicsState() }
-        // Align the dot centre at the top of its orbit with the top bars' bottom edge.
+        // Preserve the flower placement established against the top bars.
         let ornamentCentreY: CGFloat = 112 + 50 * ornamentScale
         let ornamentTransform = NSAffineTransform()
         ornamentTransform.translateX(by: 645, yBy: ornamentCentreY)
@@ -123,15 +125,26 @@ final class ClockView: NSView {
         FlowerState.pattern(rotation: 1.0, reversedSkew: true).addClip()
         light(FlowerState.pattern(rotation: state.discAngle))
         NSGraphicsContext.restoreGraphicsState()
-        let dot = CGPoint(x: 645 + 50 * sin(state.dotAngle), y: 212 - 50 * cos(state.dotAngle))
+        let orbitRadius: CGFloat = 46.46
+        let dot = CGPoint(x: 645 + orbitRadius * sin(state.dotAngle), y: 212 - orbitRadius * cos(state.dotAngle))
         light(NSBezierPath(ovalIn: NSRect(x: dot.x - 2.2, y: dot.y - 2.2, width: 4.4, height: 4.4)))
     }
     override func draw(_ dirtyRect: NSRect) {
-        NSColor(srgbRed: 0.075,green: 0.075,blue: 0.07,alpha: 1).setFill(); bounds.fill()
+        let fullScreen = isFullScreenDisplay
+        (fullScreen ? NSColor.black : NSColor(srgbRed: 0.075,green: 0.075,blue: 0.07,alpha: 1)).setFill()
+        bounds.fill()
         NSGraphicsContext.saveGraphicsState()
-        let scale = min(bounds.width / 800, bounds.height / (displayOnly ? 405 : 570))
-        let transform = NSAffineTransform(); transform.translateX(by: (bounds.width - 800 * scale)/2, yBy: (bounds.height - (displayOnly ? 405 : 570)*scale)/2)
-        transform.scale(by: scale); transform.concat()
+        let canvas = fullScreen ? NSRect(x: 90,y: 75,width: 655,height: 245)
+                                : NSRect(x: 0,y: 0,width: 800,height: displayOnly ? 405 : 570)
+        let scale = min(bounds.width / canvas.width, bounds.height / canvas.height)
+        let transform = NSAffineTransform()
+        transform.translateX(by: (bounds.width - canvas.width * scale) / 2,
+                             yBy: (bounds.height - canvas.height * scale) / 2)
+        transform.scale(by: scale)
+        transform.translateX(by: -canvas.minX,yBy: -canvas.minY)
+        transform.concat()
+        let glass = NSBezierPath()
+        if !fullScreen {
         if !displayOnly {
             shape(NSRect(x: 224,y: 484,width: 352,height: 39),radius: 2,color: NSColor(white: 0.035,alpha: 1))
             let stem = polygon([CGPoint(x: 328,y: 390),CGPoint(x: 472,y: 390),CGPoint(x: 491,y: 517),CGPoint(x: 309,y: 517)])
@@ -151,7 +164,6 @@ final class ClockView: NSView {
         body.curve(to: CGPoint(x: 37,y: 24),controlPoint1: CGPoint(x: 22,y: 29),controlPoint2: CGPoint(x: 27,y: 24))
         body.close()
         NSGradient(starting: NSColor(srgbRed: 0.96,green: 0.95,blue: 0.9,alpha: 1),ending: NSColor(srgbRed: 0.76,green: 0.76,blue: 0.70,alpha: 1))!.draw(in: body,angle: 90)
-        let glass = NSBezierPath()
         glass.move(to: CGPoint(x: 47,y: 43))
         glass.line(to: CGPoint(x: 753,y: 43))
         glass.line(to: CGPoint(x: 727,y: 325))
@@ -161,6 +173,7 @@ final class ClockView: NSView {
         glass.close()
         NSColor(white: 0.02,alpha: 1).setStroke(); glass.lineWidth = 6; glass.stroke()
         NSGradient(starting: NSColor(srgbRed: 0.065,green: 0.061,blue: 0.047,alpha: 1),ending: NSColor(white: 0.012,alpha: 1))!.draw(in: glass,angle: 90)
+        }
         let time = ClockTime(date)
         let d = time.digits
         digit(d[0],x: 88,y: 102,small: true); digit(d[1],x: 153,y: 102)
@@ -182,6 +195,7 @@ final class ClockView: NSView {
                        withAttributes: indicatorAttributes)
         NSGraphicsContext.restoreGraphicsState()
         flower(seconds: date.timeIntervalSince1970)
+        if !fullScreen {
         NSGraphicsContext.saveGraphicsState(); glass.addClip()
         NSColor(white: 1,alpha: 0.025).setFill()
         polygon([CGPoint(x: 49,y: 43),CGPoint(x: 751,y: 43),CGPoint(x: 751,y: 67),CGPoint(x: 49,y: 150)]).fill()
@@ -195,6 +209,7 @@ final class ClockView: NSView {
         badgeText.draw(at: CGPoint(x: badge.midX - badgeSize.width / 2,
                                   y: badge.midY + badgeFont.capHeight / 2 - badgeFont.ascender),
                        withAttributes: badgeAttributes)
+        }
         NSGraphicsContext.restoreGraphicsState()
     }
 }
@@ -204,6 +219,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     let clock = ClockView()
     var timer: Timer?
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if let iconURL = Bundle.main.url(forResource: "Lumitime", withExtension: "icns"),
+           let icon = NSImage(contentsOf: iconURL) {
+            NSApp.applicationIconImage = icon
+        }
         window = NSWindow(contentRect: NSRect(x: 0,y: 0,width: 800,height: 570),styleMask: [.titled,.closable,.miniaturizable,.resizable],backing: .buffered,defer: false)
         window.title = "Lumitime KT-10B"; window.backgroundColor = NSColor(white: 0.075,alpha: 1)
         window.titlebarAppearsTransparent = true; window.minSize = NSSize(width: 400,height: 310)
@@ -269,6 +288,7 @@ if CommandLine.arguments.contains("--self-test") {
 } else if let i = CommandLine.arguments.firstIndex(of: "--snapshot"), i + 1 < CommandLine.arguments.count {
     _ = NSApplication.shared
     let view = ClockView(frame: NSRect(x: 0,y: 0,width: 1000,height: 713))
+    view.fullScreenPreview = CommandLine.arguments.contains("--full-screen")
     view.date = Calendar.current.date(from: DateComponents(year: 2026,month: 9,day: 5,hour: 10,minute: 28,second: 6))!
     if let phaseIndex = CommandLine.arguments.firstIndex(of: "--seconds"), phaseIndex + 1 < CommandLine.arguments.count,
        let seconds = Double(CommandLine.arguments[phaseIndex + 1]) {

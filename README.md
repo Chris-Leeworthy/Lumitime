@@ -13,7 +13,7 @@ Use the **View** menu:
 - **⌘T:** Keep on top.
 - **⌘D:** Hide the pedestal for a compact display.
 - **⌘B:** Dim the orange illumination.
-- **⌘F:** Full screen.
+- **⌘F:** Full screen with only the illuminated display on black; exit to restore the case.
 - **⌘Q:** Quit.
 
 Drag the window to move it; resize from its edges. Display preferences persist between launches.
