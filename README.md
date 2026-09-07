@@ -15,6 +15,7 @@ Use the **View** menu:
 - **⌘B:** Dim the illumination.
 - **⌘F:** Full screen with only the illuminated display on black; exit to restore the case.
 - **Display Colour:** Choose Original Orange, LED Red, or VFD Blue-Green. The two additional palettes evoke 1970s LED and vacuum-fluorescent displays.
+- **⌘⇧C:** Cycle through display colours. The selected colour name appears for two seconds.
 - **Flower:** Choose Original Flower or Breathing Lotus. Both rotate once every 64 seconds; the outer seconds dot keeps its one-minute orbit.
 - **⌘Q:** Quit.
 

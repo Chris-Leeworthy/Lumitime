@@ -132,7 +132,64 @@ final class ClockView: NSView {
     override var mouseDownCanMoveWindow: Bool { true }
     var displayColour = DisplayColour(rawValue: UserDefaults.standard.string(forKey: "displayColour") ?? "") ?? .orange
     var flowerStyle = FlowerStyle(rawValue: UserDefaults.standard.string(forKey: "flowerStyle") ?? "") ?? .original
+    var colourNoticeUntil: TimeInterval = 0
     var illumination: NSColor { displayColour.illumination }
+
+    func showColourNotice() {
+        colourNoticeUntil = ProcessInfo.processInfo.systemUptime + 2
+        needsDisplay = true
+        NSAccessibility.post(element: self, notification: .announcementRequested,
+                             userInfo: [.announcement: displayColour.title, .priority: NSAccessibilityPriorityLevel.medium.rawValue])
+    }
+
+    func drawColourNotice() {
+        let remaining = colourNoticeUntil - ProcessInfo.processInfo.systemUptime
+        guard remaining > 0 else { return }
+        let alpha = min(1, remaining / 0.3)
+        // Wide, chamfered vector lettering inspired by 1970s sci-fi displays.
+        let glyphs: [Character: [[CGPoint]]] = [
+            "A": [[.init(x:0,y:7),.init(x:0,y:1),.init(x:1,y:0),.init(x:5,y:0),.init(x:6,y:1),.init(x:6,y:7)], [.init(x:0,y:4),.init(x:6,y:4)]],
+            "B": [[.init(x:0,y:0),.init(x:5,y:0),.init(x:6,y:1),.init(x:6,y:2.5),.init(x:5,y:3.5),.init(x:0,y:3.5)], [.init(x:5,y:3.5),.init(x:6,y:4.5),.init(x:6,y:6),.init(x:5,y:7),.init(x:0,y:7),.init(x:0,y:0)]],
+            "D": [[.init(x:0,y:0),.init(x:4.5,y:0),.init(x:6,y:1.5),.init(x:6,y:5.5),.init(x:4.5,y:7),.init(x:0,y:7),.init(x:0,y:0)]],
+            "E": [[.init(x:6,y:0),.init(x:0,y:0),.init(x:0,y:7),.init(x:6,y:7)], [.init(x:0,y:3.5),.init(x:5,y:3.5)]],
+            "F": [[.init(x:6,y:0),.init(x:0,y:0),.init(x:0,y:7)], [.init(x:0,y:3.5),.init(x:5,y:3.5)]],
+            "G": [[.init(x:6,y:1),.init(x:5,y:0),.init(x:1,y:0),.init(x:0,y:1),.init(x:0,y:6),.init(x:1,y:7),.init(x:6,y:7),.init(x:6,y:3.5),.init(x:3,y:3.5)]],
+            "I": [[.init(x:1,y:0),.init(x:5,y:0)], [.init(x:3,y:0),.init(x:3,y:7)], [.init(x:1,y:7),.init(x:5,y:7)]],
+            "L": [[.init(x:0,y:0),.init(x:0,y:7),.init(x:6,y:7)]],
+            "N": [[.init(x:0,y:7),.init(x:0,y:0),.init(x:6,y:7),.init(x:6,y:0)]],
+            "O": [[.init(x:1,y:0),.init(x:5,y:0),.init(x:6,y:1),.init(x:6,y:6),.init(x:5,y:7),.init(x:1,y:7),.init(x:0,y:6),.init(x:0,y:1),.init(x:1,y:0)]],
+            "R": [[.init(x:0,y:7),.init(x:0,y:0),.init(x:5,y:0),.init(x:6,y:1),.init(x:6,y:2.5),.init(x:5,y:3.5),.init(x:0,y:3.5)], [.init(x:3,y:3.5),.init(x:6,y:7)]],
+            "U": [[.init(x:0,y:0),.init(x:0,y:6),.init(x:1,y:7),.init(x:5,y:7),.init(x:6,y:6),.init(x:6,y:0)]],
+            "V": [[.init(x:0,y:0),.init(x:0,y:3),.init(x:3,y:7),.init(x:6,y:3),.init(x:6,y:0)]],
+            "-": [[.init(x:1,y:3.5),.init(x:5,y:3.5)]]
+        ]
+        let text = Array(displayColour.title.uppercased())
+        let scale: CGFloat = 1.65
+        let width = CGFloat(text.count * 9 - 3) * scale
+        let origin = CGPoint(x: (isFullScreenDisplay ? 417.5 : 400) - width / 2, y: 306)
+        let lettering = NSBezierPath()
+        for (index, character) in text.enumerated() {
+            for stroke in glyphs[character] ?? [] {
+                for (pointIndex, point) in stroke.enumerated() {
+                    let position = CGPoint(x: origin.x + (CGFloat(index * 9) + point.x) * scale,
+                                           y: origin.y + point.y * scale)
+                    if pointIndex == 0 { lettering.move(to: position) } else { lettering.line(to: position) }
+                }
+            }
+        }
+        NSGraphicsContext.saveGraphicsState()
+        let glow = NSShadow()
+        glow.shadowColor = illumination.withAlphaComponent(0.5 * alpha * brightness)
+        glow.shadowBlurRadius = 4
+        glow.shadowOffset = .zero
+        glow.set()
+        illumination.withAlphaComponent(alpha * brightness).setStroke()
+        lettering.lineWidth = 1.2
+        lettering.lineJoinStyle = .bevel
+        lettering.stroke()
+        NSGraphicsContext.restoreGraphicsState()
+    }
+
     func shape(_ rect: NSRect, radius: CGFloat, color: NSColor) {
         color.setFill(); NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
     }
@@ -272,6 +329,7 @@ final class ClockView: NSView {
                        withAttributes: indicatorAttributes)
         NSGraphicsContext.restoreGraphicsState()
         flower(seconds: date.timeIntervalSince1970)
+        drawColourNotice()
         if !fullScreen {
         NSGraphicsContext.saveGraphicsState(); glass.addClip()
         NSColor(white: 1,alpha: 0.025).setFill()
@@ -295,6 +353,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     var window: NSWindow!
     let clock = ClockView()
     var timer: Timer?
+    let colourMenu = NSMenu(title: "Display Colour")
     func applicationDidFinishLaunching(_ notification: Notification) {
         if let iconURL = Bundle.main.url(forResource: "Lumitime", withExtension: "icns"),
            let icon = NSImage(contentsOf: iconURL) {
@@ -321,7 +380,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         viewMenu.addItem(withTitle: "Enter Full Screen",action: #selector(fullScreen),keyEquivalent: "f").target = self
         let colourItem = viewMenu.addItem(withTitle: "Display Colour", action: nil, keyEquivalent: "")
-        let colourMenu = NSMenu(title: "Display Colour")
         colourItem.submenu = colourMenu
         for colour in DisplayColour.allCases {
             let item = colourMenu.addItem(withTitle: colour.title, action: #selector(changeDisplayColour(_:)), keyEquivalent: "")
@@ -329,6 +387,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             item.representedObject = colour.rawValue
             item.state = clock.displayColour == colour ? .on : .off
         }
+        let cycleItem = viewMenu.addItem(withTitle: "Cycle Display Colour", action: #selector(cycleDisplayColour), keyEquivalent: "c")
+        cycleItem.keyEquivalentModifierMask = [.command, .shift]
+        cycleItem.target = self
         let flowerItem = viewMenu.addItem(withTitle: "Flower", action: nil, keyEquivalent: "")
         let flowerMenu = NSMenu(title: "Flower")
         flowerItem.submenu = flowerMenu
@@ -347,12 +408,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func changeDisplayColour(_ sender: NSMenuItem) {
         guard let rawValue = sender.representedObject as? String,
               let colour = DisplayColour(rawValue: rawValue) else { return }
+        applyDisplayColour(colour)
+    }
+    @objc func cycleDisplayColour() {
+        let colours = DisplayColour.allCases
+        let index = colours.firstIndex(of: clock.displayColour) ?? 0
+        applyDisplayColour(colours[(index + 1) % colours.count])
+    }
+    func applyDisplayColour(_ colour: DisplayColour) {
         clock.displayColour = colour
         UserDefaults.standard.set(colour.rawValue, forKey: "displayColour")
-        for item in sender.menu?.items ?? [] {
+        for item in colourMenu.items {
             item.state = (item.representedObject as? String) == colour.rawValue ? .on : .off
         }
-        clock.needsDisplay = true
+        clock.showColourNotice()
     }
     @objc func changeFlowerStyle(_ sender: NSMenuItem) {
         guard let rawValue = sender.representedObject as? String,
@@ -411,6 +480,7 @@ if CommandLine.arguments.contains("--self-test") {
        let style = FlowerStyle(rawValue: CommandLine.arguments[styleIndex + 1]) {
         view.flowerStyle = style
     }
+    if CommandLine.arguments.contains("--colour-notice") { view.showColourNotice() }
     view.fullScreenPreview = CommandLine.arguments.contains("--full-screen")
     view.date = Calendar.current.date(from: DateComponents(year: 2026,month: 9,day: 5,hour: 10,minute: 28,second: 6))!
     if let phaseIndex = CommandLine.arguments.firstIndex(of: "--seconds"), phaseIndex + 1 < CommandLine.arguments.count,
