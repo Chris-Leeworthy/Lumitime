@@ -22,6 +22,34 @@ struct FlowerState {
         dotAngle = CGFloat(seconds.truncatingRemainder(dividingBy: 60) / 60 * 2 * .pi)
     }
 
+    static func breathingLotus(seconds: Double) -> NSBezierPath {
+        let flower = NSBezierPath()
+        let rotation = FlowerState(seconds: seconds).discAngle
+        // Match the approved preview, scaled to the original flower's radius.
+        for index in 0..<12 {
+            let phase = seconds.truncatingRemainder(dividingBy: 10) * .pi / 5
+                + Double(index % 2) * .pi
+            let bloom = (1 + sin(phase)) / 2
+            let length = 66 + 48 * bloom
+            let width = 9 + 12 * (1 - bloom)
+            let curl = 12 * sin(phase)
+            let petal = NSBezierPath()
+            petal.move(to: CGPoint(x: -3, y: -12))
+            petal.curve(to: CGPoint(x: curl, y: -length),
+                        controlPoint1: CGPoint(x: -width, y: -30),
+                        controlPoint2: CGPoint(x: -width + curl, y: -length + 15))
+            petal.curve(to: CGPoint(x: 3, y: -12),
+                        controlPoint1: CGPoint(x: width + curl, y: -length + 15),
+                        controlPoint2: CGPoint(x: width, y: -30))
+            petal.close()
+            petal.transform(using: AffineTransform(rotationByDegrees: CGFloat(index) * 30 + rotation))
+            flower.append(petal)
+        }
+        flower.appendOval(in: NSRect(x: -7, y: -7, width: 14, height: 14))
+        flower.transform(using: AffineTransform(scale: 40.0 / 114.0))
+        return flower
+    }
+
     static func pattern(rotation: CGFloat = 0, reversedSkew: Bool = false) -> NSBezierPath {
         let pattern = NSBezierPath()
         for index in 0..<16 {
@@ -51,6 +79,48 @@ struct FlowerState {
     }
 }
 
+enum FlowerStyle: String, CaseIterable {
+    case original, breathingLotus
+
+    var title: String { self == .original ? "Original Flower" : "Breathing Lotus" }
+}
+
+enum DisplayColour: String, CaseIterable {
+    case orange, ledRed, vfdBlueGreen
+
+    var title: String {
+        switch self {
+        case .orange: return "Original Orange"
+        case .ledRed: return "LED Red"
+        case .vfdBlueGreen: return "VFD Blue-Green"
+        }
+    }
+
+    var illumination: NSColor {
+        switch self {
+        case .orange: return NSColor(srgbRed: 1, green: 0.22, blue: 0.045, alpha: 1)
+        case .ledRed: return NSColor(srgbRed: 1, green: 0.055, blue: 0.025, alpha: 1)
+        case .vfdBlueGreen: return NSColor(srgbRed: 0.22, green: 1, blue: 0.78, alpha: 1)
+        }
+    }
+
+    var highlight: NSColor {
+        switch self {
+        case .orange: return NSColor(srgbRed: 1, green: 0.38, blue: 0.12, alpha: 1)
+        case .ledRed: return NSColor(srgbRed: 1, green: 0.25, blue: 0.14, alpha: 1)
+        case .vfdBlueGreen: return NSColor(srgbRed: 0.61, green: 1, blue: 0.89, alpha: 1)
+        }
+    }
+
+    var inactive: NSColor {
+        switch self {
+        case .orange: return NSColor(srgbRed: 0.13, green: 0.065, blue: 0.045, alpha: 0.24)
+        case .ledRed: return NSColor(srgbRed: 0.13, green: 0.035, blue: 0.025, alpha: 0.24)
+        case .vfdBlueGreen: return NSColor(srgbRed: 0.035, green: 0.13, blue: 0.10, alpha: 0.24)
+        }
+    }
+}
+
 final class ClockView: NSView {
     let ornamentScale: CGFloat = 1.4641
     var fullScreenPreview = false
@@ -60,7 +130,9 @@ final class ClockView: NSView {
     var brightness: CGFloat = UserDefaults.standard.object(forKey: "dim") as? Bool == true ? 0.48 : 1
     override var isFlipped: Bool { true }
     override var mouseDownCanMoveWindow: Bool { true }
-    let orange = NSColor(srgbRed: 1, green: 0.22, blue: 0.045, alpha: 1)
+    var displayColour = DisplayColour(rawValue: UserDefaults.standard.string(forKey: "displayColour") ?? "") ?? .orange
+    var flowerStyle = FlowerStyle(rawValue: UserDefaults.standard.string(forKey: "flowerStyle") ?? "") ?? .original
+    var illumination: NSColor { displayColour.illumination }
     func shape(_ rect: NSRect, radius: CGFloat, color: NSColor) {
         color.setFill(); NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
     }
@@ -70,11 +142,11 @@ final class ClockView: NSView {
     func light(_ path: NSBezierPath, active: Bool = true) {
         NSGraphicsContext.saveGraphicsState()
         if active {
-            let glow = NSShadow(); glow.shadowColor = orange.withAlphaComponent(0.65 * brightness); glow.shadowBlurRadius = 9; glow.shadowOffset = .zero; glow.set()
-            orange.withAlphaComponent(brightness).setFill(); path.fill()
+            let glow = NSShadow(); glow.shadowColor = illumination.withAlphaComponent(0.65 * brightness); glow.shadowBlurRadius = 9; glow.shadowOffset = .zero; glow.set()
+            illumination.withAlphaComponent(brightness).setFill(); path.fill()
             NSShadow().set()
-            NSColor(srgbRed: 1, green: 0.38, blue: 0.12, alpha: 0.5 * brightness).setStroke(); path.lineWidth = 0.6; path.stroke()
-        } else { NSColor(srgbRed: 0.13, green: 0.065, blue: 0.045, alpha: 0.24).setFill(); path.fill() }
+            displayColour.highlight.withAlphaComponent(0.5 * brightness).setStroke(); path.lineWidth = 0.6; path.stroke()
+        } else { displayColour.inactive.setFill(); path.fill() }
         NSGraphicsContext.restoreGraphicsState()
     }
     func digit(_ number: Int?, x: CGFloat, y: CGFloat, small: Bool = false) {
@@ -121,9 +193,14 @@ final class ClockView: NSView {
         let centre = NSAffineTransform()
         centre.translateX(by: 645, yBy: 212)
         centre.concat()
-        // Opposite skew inferred from the mask photograph; widths remain approximate.
-        FlowerState.pattern(rotation: 1.0, reversedSkew: true).addClip()
-        light(FlowerState.pattern(rotation: state.discAngle))
+        switch flowerStyle {
+        case .original:
+            // Opposite skew inferred from the mask photograph; widths remain approximate.
+            FlowerState.pattern(rotation: 1.0, reversedSkew: true).addClip()
+            light(FlowerState.pattern(rotation: state.discAngle))
+        case .breathingLotus:
+            light(FlowerState.breathingLotus(seconds: seconds))
+        }
         NSGraphicsContext.restoreGraphicsState()
         let orbitRadius: CGFloat = 46.46
         let dot = CGPoint(x: 645 + orbitRadius * sin(state.dotAngle), y: 212 - orbitRadius * cos(state.dotAngle))
@@ -181,14 +258,14 @@ final class ClockView: NSView {
         for y: CGFloat in [164,234] { light(NSBezierPath(rect: NSRect(x: 290,y: y,width: 12,height: 7))) }
         NSGraphicsContext.saveGraphicsState()
         let indicatorGlow = NSShadow()
-        indicatorGlow.shadowColor = orange.withAlphaComponent(0.45 * brightness)
+        indicatorGlow.shadowColor = illumination.withAlphaComponent(0.45 * brightness)
         indicatorGlow.shadowBlurRadius = 5
         indicatorGlow.shadowOffset = .zero
         indicatorGlow.set()
         let indicator = (time.isPM ? "PM" : "AM") as NSString
         let indicatorFont = NSFont.monospacedSystemFont(ofSize: 14, weight: .medium)
         let indicatorAttributes: [NSAttributedString.Key: Any] = [
-            .font: indicatorFont, .foregroundColor: orange.withAlphaComponent(brightness)]
+            .font: indicatorFont, .foregroundColor: illumination.withAlphaComponent(brightness)]
         // Align with the leftmost petal extent and the bottom of the digits.
         indicator.draw(at: CGPoint(x: 645 - 40 * ornamentScale,
                                    y: 291 - indicatorFont.ascender),
@@ -243,14 +320,52 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let item = viewMenu.addItem(withTitle: title,action: selector,keyEquivalent: key); item.target = self; item.state = on ? .on : .off
         }
         viewMenu.addItem(withTitle: "Enter Full Screen",action: #selector(fullScreen),keyEquivalent: "f").target = self
+        let colourItem = viewMenu.addItem(withTitle: "Display Colour", action: nil, keyEquivalent: "")
+        let colourMenu = NSMenu(title: "Display Colour")
+        colourItem.submenu = colourMenu
+        for colour in DisplayColour.allCases {
+            let item = colourMenu.addItem(withTitle: colour.title, action: #selector(changeDisplayColour(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = colour.rawValue
+            item.state = clock.displayColour == colour ? .on : .off
+        }
+        let flowerItem = viewMenu.addItem(withTitle: "Flower", action: nil, keyEquivalent: "")
+        let flowerMenu = NSMenu(title: "Flower")
+        flowerItem.submenu = flowerMenu
+        for style in FlowerStyle.allCases {
+            let item = flowerMenu.addItem(withTitle: style.title, action: #selector(changeFlowerStyle(_:)), keyEquivalent: "")
+            item.target = self
+            item.representedObject = style.rawValue
+            item.state = clock.flowerStyle == style ? .on : .off
+        }
         NSApp.mainMenu = menu; NSApp.activate(ignoringOtherApps: true)
     }
     @objc func update() { clock.date = Date(); clock.needsDisplay = true; clock.setAccessibilityValue(clock.date.formatted(date: .omitted,time: .standard)) }
     @objc func onTop(_ sender: NSMenuItem) { sender.state = sender.state == .on ? .off : .on; window.level = sender.state == .on ? .floating : .normal; UserDefaults.standard.set(sender.state == .on,forKey: "onTop") }
     @objc func displayOnly(_ sender: NSMenuItem) { clock.displayOnly.toggle(); sender.state = clock.displayOnly ? .on : .off; UserDefaults.standard.set(clock.displayOnly,forKey: "displayOnly"); clock.needsDisplay = true }
     @objc func dim(_ sender: NSMenuItem) { sender.state = sender.state == .on ? .off : .on; clock.brightness = sender.state == .on ? 0.48 : 1; UserDefaults.standard.set(sender.state == .on,forKey: "dim"); clock.needsDisplay = true }
+    @objc func changeDisplayColour(_ sender: NSMenuItem) {
+        guard let rawValue = sender.representedObject as? String,
+              let colour = DisplayColour(rawValue: rawValue) else { return }
+        clock.displayColour = colour
+        UserDefaults.standard.set(colour.rawValue, forKey: "displayColour")
+        for item in sender.menu?.items ?? [] {
+            item.state = (item.representedObject as? String) == colour.rawValue ? .on : .off
+        }
+        clock.needsDisplay = true
+    }
+    @objc func changeFlowerStyle(_ sender: NSMenuItem) {
+        guard let rawValue = sender.representedObject as? String,
+              let style = FlowerStyle(rawValue: rawValue) else { return }
+        clock.flowerStyle = style
+        UserDefaults.standard.set(style.rawValue, forKey: "flowerStyle")
+        for item in sender.menu?.items ?? [] {
+            item.state = (item.representedObject as? String) == style.rawValue ? .on : .off
+        }
+        clock.needsDisplay = true
+    }
     @objc func fullScreen() { window.toggleFullScreen(nil) }
-    @objc func about() { NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "Lumitime",.applicationVersion: "1.0",.credits: NSAttributedString(string: "A native tribute to the Tamura Lumitime KT-10B.\nCustom orange shutter digits and a flower seconds display.\nBlooming petals and a clockwise seconds dot, based on the video reference.")]) }
+    @objc func about() { NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "Lumitime",.applicationVersion: "1.0",.credits: NSAttributedString(string: "A native tribute to the Tamura Lumitime KT-10B.\nCustom illuminated shutter digits and a flower seconds display.\nBlooming petals and a clockwise seconds dot, based on the video reference.")]) }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
 }
 
@@ -288,6 +403,14 @@ if CommandLine.arguments.contains("--self-test") {
 } else if let i = CommandLine.arguments.firstIndex(of: "--snapshot"), i + 1 < CommandLine.arguments.count {
     _ = NSApplication.shared
     let view = ClockView(frame: NSRect(x: 0,y: 0,width: 1000,height: 713))
+    if let colourIndex = CommandLine.arguments.firstIndex(of: "--colour"), colourIndex + 1 < CommandLine.arguments.count,
+       let colour = DisplayColour(rawValue: CommandLine.arguments[colourIndex + 1]) {
+        view.displayColour = colour
+    }
+    if let styleIndex = CommandLine.arguments.firstIndex(of: "--flower"), styleIndex + 1 < CommandLine.arguments.count,
+       let style = FlowerStyle(rawValue: CommandLine.arguments[styleIndex + 1]) {
+        view.flowerStyle = style
+    }
     view.fullScreenPreview = CommandLine.arguments.contains("--full-screen")
     view.date = Calendar.current.date(from: DateComponents(year: 2026,month: 9,day: 5,hour: 10,minute: 28,second: 6))!
     if let phaseIndex = CommandLine.arguments.firstIndex(of: "--seconds"), phaseIndex + 1 < CommandLine.arguments.count,
