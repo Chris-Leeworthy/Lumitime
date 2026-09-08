@@ -99,7 +99,7 @@ enum DisplayColour: String, CaseIterable {
     var illumination: NSColor {
         switch self {
         case .orange: return NSColor(srgbRed: 1, green: 0.22, blue: 0.045, alpha: 1)
-        case .ledRed: return NSColor(srgbRed: 1, green: 0.055, blue: 0.025, alpha: 1)
+        case .ledRed: return NSColor(srgbRed: 0.88, green: 0, blue: 0.035, alpha: 1)
         case .vfdBlueGreen: return NSColor(srgbRed: 0.22, green: 1, blue: 0.78, alpha: 1)
         }
     }
@@ -107,7 +107,7 @@ enum DisplayColour: String, CaseIterable {
     var highlight: NSColor {
         switch self {
         case .orange: return NSColor(srgbRed: 1, green: 0.38, blue: 0.12, alpha: 1)
-        case .ledRed: return NSColor(srgbRed: 1, green: 0.25, blue: 0.14, alpha: 1)
+        case .ledRed: return NSColor(srgbRed: 1, green: 0.025, blue: 0.075, alpha: 1)
         case .vfdBlueGreen: return NSColor(srgbRed: 0.61, green: 1, blue: 0.89, alpha: 1)
         }
     }
@@ -115,7 +115,7 @@ enum DisplayColour: String, CaseIterable {
     var inactive: NSColor {
         switch self {
         case .orange: return NSColor(srgbRed: 0.13, green: 0.065, blue: 0.045, alpha: 0.24)
-        case .ledRed: return NSColor(srgbRed: 0.13, green: 0.035, blue: 0.025, alpha: 0.24)
+        case .ledRed: return NSColor(srgbRed: 0.12, green: 0.005, blue: 0.012, alpha: 0.24)
         case .vfdBlueGreen: return NSColor(srgbRed: 0.035, green: 0.13, blue: 0.10, alpha: 0.24)
         }
     }
