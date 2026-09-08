@@ -22,33 +22,16 @@ struct FlowerState {
         dotAngle = CGFloat(seconds.truncatingRemainder(dividingBy: 60) / 60 * 2 * .pi)
     }
 
-    static func breathingLotus(seconds: Double) -> NSBezierPath {
-        let flower = NSBezierPath()
-        let rotation = FlowerState(seconds: seconds).discAngle
-        // Match the approved preview, scaled to the original flower's radius.
-        for index in 0..<12 {
-            let phase = seconds.truncatingRemainder(dividingBy: 10) * .pi / 5
-                + Double(index % 2) * .pi
-            let bloom = (1 + sin(phase)) / 2
-            let length = 66 + 48 * bloom
-            let width = 9 + 12 * (1 - bloom)
-            let curl = 12 * sin(phase)
-            let petal = NSBezierPath()
-            petal.move(to: CGPoint(x: -3, y: -12))
-            petal.curve(to: CGPoint(x: curl, y: -length),
-                        controlPoint1: CGPoint(x: -width, y: -30),
-                        controlPoint2: CGPoint(x: -width + curl, y: -length + 15))
-            petal.curve(to: CGPoint(x: 3, y: -12),
-                        controlPoint1: CGPoint(x: width + curl, y: -length + 15),
-                        controlPoint2: CGPoint(x: width, y: -30))
-            petal.close()
-            petal.transform(using: AffineTransform(rotationByDegrees: CGFloat(index) * 30 + rotation))
-            flower.append(petal)
+    // Fixed apertures every two seconds reveal the moving light.
+    static let orbitMask: NSBezierPath = {
+        let mask = NSBezierPath()
+        for second in stride(from: 0, to: 60, by: 2) {
+            let angle = CGFloat(second) / 60 * 2 * .pi
+            let centre = CGPoint(x: 645 + 46.46 * sin(angle), y: 212 - 46.46 * cos(angle))
+            mask.appendOval(in: NSRect(x: centre.x - 2.1252, y: centre.y - 2.1252, width: 4.2504, height: 4.2504))
         }
-        flower.appendOval(in: NSRect(x: -7, y: -7, width: 14, height: 14))
-        flower.transform(using: AffineTransform(scale: 40.0 / 114.0))
-        return flower
-    }
+        return mask
+    }()
 
     static func pattern(rotation: CGFloat = 0, reversedSkew: Bool = false) -> NSBezierPath {
         let pattern = NSBezierPath()
@@ -77,12 +60,6 @@ struct FlowerState {
         }
         return pattern
     }
-}
-
-enum FlowerStyle: String, CaseIterable {
-    case original, breathingLotus
-
-    var title: String { self == .original ? "Original Flower" : "Breathing Lotus" }
 }
 
 enum DisplayColour: String, CaseIterable {
@@ -131,7 +108,6 @@ final class ClockView: NSView {
     override var isFlipped: Bool { true }
     override var mouseDownCanMoveWindow: Bool { true }
     var displayColour = DisplayColour(rawValue: UserDefaults.standard.string(forKey: "displayColour") ?? "") ?? .orange
-    var flowerStyle = FlowerStyle(rawValue: UserDefaults.standard.string(forKey: "flowerStyle") ?? "") ?? .original
     var colourNoticeUntil: TimeInterval = 0
     var illumination: NSColor { displayColour.illumination }
 
@@ -250,18 +226,16 @@ final class ClockView: NSView {
         let centre = NSAffineTransform()
         centre.translateX(by: 645, yBy: 212)
         centre.concat()
-        switch flowerStyle {
-        case .original:
-            // Opposite skew inferred from the mask photograph; widths remain approximate.
-            FlowerState.pattern(rotation: 1.0, reversedSkew: true).addClip()
-            light(FlowerState.pattern(rotation: state.discAngle))
-        case .breathingLotus:
-            light(FlowerState.breathingLotus(seconds: seconds))
-        }
+        // Opposite skew inferred from the mask photograph; widths remain approximate.
+        FlowerState.pattern(rotation: 1.0, reversedSkew: true).addClip()
+        light(FlowerState.pattern(rotation: state.discAngle))
         NSGraphicsContext.restoreGraphicsState()
         let orbitRadius: CGFloat = 46.46
         let dot = CGPoint(x: 645 + orbitRadius * sin(state.dotAngle), y: 212 - orbitRadius * cos(state.dotAngle))
-        light(NSBezierPath(ovalIn: NSRect(x: dot.x - 2.2, y: dot.y - 2.2, width: 4.4, height: 4.4)))
+        NSGraphicsContext.saveGraphicsState()
+        FlowerState.orbitMask.addClip()
+        light(NSBezierPath(ovalIn: NSRect(x: dot.x - 2.92215, y: dot.y - 2.92215, width: 5.8443, height: 5.8443)))
+        NSGraphicsContext.restoreGraphicsState()
     }
     override func draw(_ dirtyRect: NSRect) {
         let fullScreen = isFullScreenDisplay
@@ -390,15 +364,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let cycleItem = viewMenu.addItem(withTitle: "Cycle Display Colour", action: #selector(cycleDisplayColour), keyEquivalent: "c")
         cycleItem.keyEquivalentModifierMask = [.command, .shift]
         cycleItem.target = self
-        let flowerItem = viewMenu.addItem(withTitle: "Flower", action: nil, keyEquivalent: "")
-        let flowerMenu = NSMenu(title: "Flower")
-        flowerItem.submenu = flowerMenu
-        for style in FlowerStyle.allCases {
-            let item = flowerMenu.addItem(withTitle: style.title, action: #selector(changeFlowerStyle(_:)), keyEquivalent: "")
-            item.target = self
-            item.representedObject = style.rawValue
-            item.state = clock.flowerStyle == style ? .on : .off
-        }
         NSApp.mainMenu = menu; NSApp.activate(ignoringOtherApps: true)
     }
     @objc func update() { clock.date = Date(); clock.needsDisplay = true; clock.setAccessibilityValue(clock.date.formatted(date: .omitted,time: .standard)) }
@@ -422,16 +387,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             item.state = (item.representedObject as? String) == colour.rawValue ? .on : .off
         }
         clock.showColourNotice()
-    }
-    @objc func changeFlowerStyle(_ sender: NSMenuItem) {
-        guard let rawValue = sender.representedObject as? String,
-              let style = FlowerStyle(rawValue: rawValue) else { return }
-        clock.flowerStyle = style
-        UserDefaults.standard.set(style.rawValue, forKey: "flowerStyle")
-        for item in sender.menu?.items ?? [] {
-            item.state = (item.representedObject as? String) == style.rawValue ? .on : .off
-        }
-        clock.needsDisplay = true
     }
     @objc func fullScreen() { window.toggleFullScreen(nil) }
     @objc func about() { NSApp.orderFrontStandardAboutPanel(options: [.applicationName: "Lumitime",.applicationVersion: "1.0",.credits: NSAttributedString(string: "A native tribute to the Tamura Lumitime KT-10B.\nCustom illuminated shutter digits and a flower seconds display.\nBlooming petals and a clockwise seconds dot, based on the video reference.")]) }
@@ -475,10 +430,6 @@ if CommandLine.arguments.contains("--self-test") {
     if let colourIndex = CommandLine.arguments.firstIndex(of: "--colour"), colourIndex + 1 < CommandLine.arguments.count,
        let colour = DisplayColour(rawValue: CommandLine.arguments[colourIndex + 1]) {
         view.displayColour = colour
-    }
-    if let styleIndex = CommandLine.arguments.firstIndex(of: "--flower"), styleIndex + 1 < CommandLine.arguments.count,
-       let style = FlowerStyle(rawValue: CommandLine.arguments[styleIndex + 1]) {
-        view.flowerStyle = style
     }
     if CommandLine.arguments.contains("--colour-notice") { view.showColourNotice() }
     view.fullScreenPreview = CommandLine.arguments.contains("--full-screen")

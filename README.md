@@ -16,14 +16,13 @@ Use the **View** menu:
 - **⌘F:** Full screen with only the illuminated display on black; exit to restore the case.
 - **Display Colour:** Choose Original Orange, LED Red, or VFD Blue-Green. The two additional palettes evoke 1970s LED and vacuum-fluorescent displays.
 - **⌘⇧C:** Cycle through display colours. The selected colour name appears for two seconds.
-- **Flower:** Choose Original Flower or Breathing Lotus. Both rotate once every 64 seconds; the outer seconds dot keeps its one-minute orbit.
 - **⌘Q:** Quit.
 
 Drag the window to move it; resize from its edges. Display preferences persist between launches.
 
 ## Design
 
-Custom vector segments reproduce the narrow, square-ended orange digits, divided vertical strokes, steady colon, and blank leading hour position. The seconds ornament uses a rigid rotating disc of 16 skewed, tapered, round-ended spokes with tangentially offset roots, alternating long and short, behind a static mask with opposite ray skew, inferred from the blurry mask photograph, rotated clockwise by 1°. Only the overlapping areas are illuminated. The decorative disc rotates 45 degrees every eight seconds. A small outer dot travels clockwise once per minute. Animation runs at 30 frames per second behind smoked glass, with a cream enclosure and pedestal.
+Custom vector segments reproduce the narrow, square-ended orange digits, divided vertical strokes, steady colon, and blank leading hour position. The seconds ornament uses a rigid rotating disc of 16 skewed, tapered, round-ended spokes with tangentially offset roots, alternating long and short, behind a static mask with opposite ray skew, inferred from the blurry mask photograph, rotated clockwise by 1°. Only the overlapping areas are illuminated. The decorative disc rotates 45 degrees every eight seconds. A small outer dot travels clockwise once per minute behind a fixed mask with 30 small apertures, revealing the light every two seconds. Animation runs at 30 frames per second behind smoked glass, with a cream enclosure and pedestal.
 
 Visual references: [AITA KT-10B photographs](https://aita.ocnk.net/product/3385) and [meguri KT-10B photographs](https://meguri1960.theshop.jp/items/95396001).
 
