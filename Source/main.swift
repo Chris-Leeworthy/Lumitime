@@ -63,13 +63,14 @@ struct FlowerState {
 }
 
 enum DisplayColour: String, CaseIterable {
-    case orange, ledRed, vfdBlueGreen
+    case orange, ledRed, vfdBlueGreen, amberTerminal
 
     var title: String {
         switch self {
         case .orange: return "Original Orange"
         case .ledRed: return "LED Red"
         case .vfdBlueGreen: return "VFD Blue-Green"
+        case .amberTerminal: return "Amber VDU"
         }
     }
 
@@ -78,6 +79,7 @@ enum DisplayColour: String, CaseIterable {
         case .orange: return NSColor(srgbRed: 1, green: 0.22, blue: 0.045, alpha: 1)
         case .ledRed: return NSColor(srgbRed: 0.88, green: 0, blue: 0.035, alpha: 1)
         case .vfdBlueGreen: return NSColor(srgbRed: 0.22, green: 1, blue: 0.78, alpha: 1)
+        case .amberTerminal: return NSColor(srgbRed: 1, green: 0.62, blue: 0.02, alpha: 1)
         }
     }
 
@@ -86,6 +88,7 @@ enum DisplayColour: String, CaseIterable {
         case .orange: return NSColor(srgbRed: 1, green: 0.38, blue: 0.12, alpha: 1)
         case .ledRed: return NSColor(srgbRed: 1, green: 0.025, blue: 0.075, alpha: 1)
         case .vfdBlueGreen: return NSColor(srgbRed: 0.61, green: 1, blue: 0.89, alpha: 1)
+        case .amberTerminal: return NSColor(srgbRed: 1, green: 0.80, blue: 0.28, alpha: 1)
         }
     }
 
@@ -94,6 +97,7 @@ enum DisplayColour: String, CaseIterable {
         case .orange: return NSColor(srgbRed: 0.13, green: 0.065, blue: 0.045, alpha: 0.24)
         case .ledRed: return NSColor(srgbRed: 0.12, green: 0.005, blue: 0.012, alpha: 0.24)
         case .vfdBlueGreen: return NSColor(srgbRed: 0.035, green: 0.13, blue: 0.10, alpha: 0.24)
+        case .amberTerminal: return NSColor(srgbRed: 0.13, green: 0.085, blue: 0.015, alpha: 0.24)
         }
     }
 }
@@ -118,10 +122,7 @@ final class ClockView: NSView {
                              userInfo: [.announcement: displayColour.title, .priority: NSAccessibilityPriorityLevel.medium.rawValue])
     }
 
-    func drawColourNotice() {
-        let remaining = colourNoticeUntil - ProcessInfo.processInfo.systemUptime
-        guard remaining > 0 else { return }
-        let alpha = min(1, remaining / 0.3)
+    func lettering(_ text: String, origin: CGPoint, scale: CGFloat) -> NSBezierPath {
         // Wide, chamfered vector lettering inspired by 1970s sci-fi displays.
         let glyphs: [Character: [[CGPoint]]] = [
             "A": [[.init(x:0,y:7),.init(x:0,y:1),.init(x:1,y:0),.init(x:5,y:0),.init(x:6,y:1),.init(x:6,y:7)], [.init(x:0,y:4),.init(x:6,y:4)]],
@@ -137,12 +138,11 @@ final class ClockView: NSView {
             "R": [[.init(x:0,y:7),.init(x:0,y:0),.init(x:5,y:0),.init(x:6,y:1),.init(x:6,y:2.5),.init(x:5,y:3.5),.init(x:0,y:3.5)], [.init(x:3,y:3.5),.init(x:6,y:7)]],
             "U": [[.init(x:0,y:0),.init(x:0,y:6),.init(x:1,y:7),.init(x:5,y:7),.init(x:6,y:6),.init(x:6,y:0)]],
             "V": [[.init(x:0,y:0),.init(x:0,y:3),.init(x:3,y:7),.init(x:6,y:3),.init(x:6,y:0)]],
+            "M": [[.init(x:0,y:7),.init(x:0,y:0),.init(x:3,y:3),.init(x:6,y:0),.init(x:6,y:7)]],
+            "P": [[.init(x:0,y:7),.init(x:0,y:0),.init(x:5,y:0),.init(x:6,y:1),.init(x:6,y:3),.init(x:5,y:4),.init(x:0,y:4)]],
+            "T": [[.init(x:0,y:0),.init(x:6,y:0)], [.init(x:3,y:0),.init(x:3,y:7)]],
             "-": [[.init(x:1,y:3.5),.init(x:5,y:3.5)]]
         ]
-        let text = Array(displayColour.title.uppercased())
-        let scale: CGFloat = 1.65
-        let width = CGFloat(text.count * 9 - 3) * scale
-        let origin = CGPoint(x: (isFullScreenDisplay ? 417.5 : 400) - width / 2, y: 306)
         let lettering = NSBezierPath()
         for (index, character) in text.enumerated() {
             for stroke in glyphs[character] ?? [] {
@@ -153,6 +153,18 @@ final class ClockView: NSView {
                 }
             }
         }
+        return lettering
+    }
+
+    func drawColourNotice() {
+        let remaining = colourNoticeUntil - ProcessInfo.processInfo.systemUptime
+        guard remaining > 0 else { return }
+        let alpha = min(1, remaining / 0.3)
+        let text = displayColour.title.uppercased()
+        let scale: CGFloat = 1.65
+        let width = CGFloat(text.count * 9 - 3) * scale
+        let origin = CGPoint(x: (isFullScreenDisplay ? 417.5 : 400) - width / 2, y: 306)
+        let lettering = lettering(text, origin: origin, scale: scale)
         NSGraphicsContext.saveGraphicsState()
         let glow = NSShadow()
         glow.shadowColor = illumination.withAlphaComponent(0.5 * alpha * brightness)
@@ -293,14 +305,16 @@ final class ClockView: NSView {
         indicatorGlow.shadowBlurRadius = 5
         indicatorGlow.shadowOffset = .zero
         indicatorGlow.set()
-        let indicator = (time.isPM ? "PM" : "AM") as NSString
-        let indicatorFont = NSFont.monospacedSystemFont(ofSize: 14, weight: .medium)
-        let indicatorAttributes: [NSAttributedString.Key: Any] = [
-            .font: indicatorFont, .foregroundColor: illumination.withAlphaComponent(brightness)]
-        // Align with the leftmost petal extent and the bottom of the digits.
-        indicator.draw(at: CGPoint(x: 645 - 40 * ornamentScale,
-                                   y: 291 - indicatorFont.ascender),
-                       withAttributes: indicatorAttributes)
+        // Separate fixed legends: AM at the flower's left edge, PM at its right.
+        let legendScale: CGFloat = 1.7
+        let legendWidth: CGFloat = 15 * legendScale
+        let legendX = time.isPM ? 645 + 40 * ornamentScale - legendWidth : 645 - 40 * ornamentScale
+        let indicator = lettering(time.isPM ? "PM" : "AM",
+                                  origin: CGPoint(x: legendX, y: 277), scale: legendScale)
+        indicator.lineWidth = 1.6
+        indicator.lineJoinStyle = .bevel
+        illumination.withAlphaComponent(brightness).setStroke()
+        indicator.stroke()
         NSGraphicsContext.restoreGraphicsState()
         flower(seconds: date.timeIntervalSince1970)
         drawColourNotice()
