@@ -337,7 +337,7 @@ final class ClockView: NSView {
     }
 }
 
-final class AppDelegate: NSObject, NSApplicationDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     var window: NSWindow!
     let clock = ClockView()
     var timer: Timer?
@@ -360,13 +360,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu(); let appItem = NSMenuItem(); menu.addItem(appItem)
         let appMenu = NSMenu(); appItem.submenu = appMenu
         appMenu.addItem(withTitle: "About Lumitime",action: #selector(about),keyEquivalent: "")
-        appMenu.addItem(.separator()); appMenu.addItem(withTitle: "Quit Lumitime",action: #selector(NSApplication.terminate(_:)),keyEquivalent: "q")
+        appMenu.addItem(.separator())
+        appMenu.addItem(withTitle: "Hide Lumitime", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        let hideOthers = appMenu.addItem(withTitle: "Hide Others", action: #selector(NSApplication.hideOtherApplications(_:)), keyEquivalent: "h")
+        hideOthers.keyEquivalentModifierMask = [.command, .option]
+        appMenu.addItem(withTitle: "Show All", action: #selector(NSApplication.unhideAllApplications(_:)), keyEquivalent: "")
+        appMenu.addItem(.separator())
+        appMenu.addItem(withTitle: "Quit Lumitime",action: #selector(NSApplication.terminate(_:)),keyEquivalent: "q")
+        let fileItem = NSMenuItem(); fileItem.title = "File"; menu.addItem(fileItem)
+        let fileMenu = NSMenu(title: "File"); fileItem.submenu = fileMenu
+        fileMenu.addItem(withTitle: "Close", action: #selector(NSWindow.performClose(_:)), keyEquivalent: "w")
         let viewItem = NSMenuItem(); viewItem.title = "View"; menu.addItem(viewItem)
         let viewMenu = NSMenu(title: "View"); viewItem.submenu = viewMenu
-        for (title,selector,key,on) in [("Keep on Top",#selector(onTop),"t",window.level == .floating),("Display Only",#selector(displayOnly),"d",clock.displayOnly),("Dim Display",#selector(dim),"b",clock.brightness < 1)] {
-            let item = viewMenu.addItem(withTitle: title,action: selector,keyEquivalent: key); item.target = self; item.state = on ? .on : .off
-        }
-        viewMenu.addItem(withTitle: "Enter Full Screen",action: #selector(fullScreen),keyEquivalent: "f").target = self
         let colourItem = viewMenu.addItem(withTitle: "Display Colour", action: nil, keyEquivalent: "")
         colourItem.submenu = colourMenu
         for colour in DisplayColour.allCases {
@@ -375,14 +380,48 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             item.representedObject = colour.rawValue
             item.state = clock.displayColour == colour ? .on : .off
         }
-        let cycleItem = viewMenu.addItem(withTitle: "Cycle Display Colour", action: #selector(cycleDisplayColour), keyEquivalent: "c")
+        let cycleItem = viewMenu.addItem(withTitle: "Next Display Colour", action: #selector(cycleDisplayColour), keyEquivalent: "c")
         cycleItem.keyEquivalentModifierMask = [.command, .shift]
         cycleItem.target = self
+        let dimItem = viewMenu.addItem(withTitle: "Dim Display", action: #selector(dim), keyEquivalent: "b")
+        dimItem.target = self
+        dimItem.state = clock.brightness < 1 ? .on : .off
+        viewMenu.addItem(.separator())
+        viewMenu.addItem(withTitle: clock.displayOnly ? "Show Pedestal" : "Hide Pedestal", action: #selector(displayOnly), keyEquivalent: "d").target = self
+        viewMenu.addItem(.separator())
+        let fullScreenItem = viewMenu.addItem(withTitle: "Enter Full Screen", action: #selector(fullScreen), keyEquivalent: "f")
+        fullScreenItem.keyEquivalentModifierMask = [.control, .command]
+        fullScreenItem.target = self
+        let windowItem = NSMenuItem(); windowItem.title = "Window"; menu.addItem(windowItem)
+        let windowMenu = NSMenu(title: "Window"); windowItem.submenu = windowMenu
+        windowMenu.addItem(withTitle: "Minimise", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
+        windowMenu.addItem(withTitle: "Zoom", action: #selector(NSWindow.performZoom(_:)), keyEquivalent: "")
+        windowMenu.addItem(.separator())
+        let onTopItem = windowMenu.addItem(withTitle: "Keep on Top", action: #selector(onTop), keyEquivalent: "t")
+        onTopItem.target = self
+        onTopItem.state = window.level == .floating ? .on : .off
+        NSApp.windowsMenu = windowMenu
         NSApp.mainMenu = menu; NSApp.activate(ignoringOtherApps: true)
+    }
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        switch menuItem.action {
+        case #selector(fullScreen):
+            menuItem.title = window.styleMask.contains(.fullScreen) ? "Exit Full Screen" : "Enter Full Screen"
+        case #selector(displayOnly):
+            menuItem.title = clock.displayOnly ? "Show Pedestal" : "Hide Pedestal"
+            return !window.styleMask.contains(.fullScreen)
+        case #selector(onTop):
+            menuItem.state = window.level == .floating ? .on : .off
+        case #selector(dim):
+            menuItem.state = clock.brightness < 1 ? .on : .off
+        default:
+            break
+        }
+        return true
     }
     @objc func update() { clock.date = Date(); clock.needsDisplay = true; clock.setAccessibilityValue(clock.date.formatted(date: .omitted,time: .standard)) }
     @objc func onTop(_ sender: NSMenuItem) { sender.state = sender.state == .on ? .off : .on; window.level = sender.state == .on ? .floating : .normal; UserDefaults.standard.set(sender.state == .on,forKey: "onTop") }
-    @objc func displayOnly(_ sender: NSMenuItem) { clock.displayOnly.toggle(); sender.state = clock.displayOnly ? .on : .off; UserDefaults.standard.set(clock.displayOnly,forKey: "displayOnly"); clock.needsDisplay = true }
+    @objc func displayOnly(_ sender: NSMenuItem) { clock.displayOnly.toggle(); sender.title = clock.displayOnly ? "Show Pedestal" : "Hide Pedestal"; UserDefaults.standard.set(clock.displayOnly,forKey: "displayOnly"); clock.needsDisplay = true }
     @objc func dim(_ sender: NSMenuItem) { sender.state = sender.state == .on ? .off : .on; clock.brightness = sender.state == .on ? 0.48 : 1; UserDefaults.standard.set(sender.state == .on,forKey: "dim"); clock.needsDisplay = true }
     @objc func changeDisplayColour(_ sender: NSMenuItem) {
         guard let rawValue = sender.representedObject as? String,

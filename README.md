@@ -10,13 +10,15 @@ The clock follows your Mac’s local time in the original 12-hour format. It res
 
 Use the **View** menu:
 
-- **⌘T:** Keep on top.
-- **⌘D:** Hide the pedestal for a compact display.
+- **⌘D:** Hide Pedestal / Show Pedestal for a compact display. Unavailable in full screen, where the case and pedestal are already hidden.
 - **⌘B:** Dim the illumination.
-- **⌘F:** Full screen with only the illuminated display on black; exit to restore the case.
+- **⌃⌘F:** Enter Full Screen / Exit Full Screen, with only the illuminated display on black; exit to restore the case.
 - **Display Colour:** Choose Original Orange, LED Red, VFD Blue-Green, or Amber VDU. The additional palettes evoke LED, vacuum-fluorescent, and warm amber terminal displays.
-- **⌘⇧C:** Cycle through display colours. The selected colour name appears for two seconds.
-- **⌘Q:** Quit.
+- **⇧⌘C:** Next Display Colour. The selected colour name appears for two seconds.
+
+Use the **Window** menu for **Keep on Top (⌘T)**, **Minimise (⌘M)**, and **Zoom**. Use **File → Close (⌘W)** to close the clock and quit the app.
+
+The **Lumitime** menu includes **Hide Lumitime (⌘H)**, **Hide Others (⌥⌘H)**, **Show All**, and **Quit Lumitime (⌘Q)**.
 
 Drag the window to move it; resize from its edges. Display preferences persist between launches under the bundle identifier `local.lumitime.desktop`.
 
